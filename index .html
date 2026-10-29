@@ -530,6 +530,13 @@ details.how p{margin-top:10px;font-size:14.5px;color:var(--muted);line-height:1.
 .tipcard .icon-btn svg.i{width:18px;height:18px}
 .save-prev{border-radius:20px;overflow:hidden;background:#101413;display:grid;place-items:center;margin-bottom:14px}
 .save-prev video,.save-prev img{display:block;width:100%;max-height:56vh;object-fit:contain}
+
+/* Exercise demos */
+.demo-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;border-radius:inherit}
+.specimen .demo-canvas.cover{background:radial-gradient(120% 90% at 50% 38%,#FFFFFF 0%,#F7F8F7 46%,#ECEFED 100%);z-index:1}
+.p-cue{position:absolute;left:14px;right:128px;bottom:14px;margin:0;padding:10px 14px;border-radius:16px;background:var(--ink);color:var(--on-ink);font:600 15px/1.25 var(--font);z-index:2}
+.player .stage-badge,.player .p-timer{z-index:2}
+.specimen .stage-badge{z-index:2}
 </style>
 </head>
 <body>
@@ -2662,17 +2669,6 @@ function neckPaths(P) {
   const mk = i => { const s = P(i); const ear = P(i === 215 ? 93 : 323); return [ear, s, [s[0] + (s[0] - chin[0]) * 0.08, s[1] + fh * 0.22], [s[0] + (s[0] - chin[0]) * 0.12, s[1] + fh * 0.42]]; };
   return [mk(215), mk(MESH_MIRROR[215])];
 }
-function glowDot(g, x, y, r, a) {
-  const gr = g.createRadialGradient(x, y, 0, x, y, r * 3.2);
-  gr.addColorStop(0, `rgba(255,90,31,${0.55 * a})`);
-  gr.addColorStop(1, 'rgba(255,90,31,0)');
-  g.fillStyle = gr;
-  g.beginPath(); g.arc(x, y, r * 3.2, 0, Math.PI * 2); g.fill();
-  g.fillStyle = `rgba(255,255,255,${a})`;
-  g.beginPath(); g.arc(x, y, r * 1.25, 0, Math.PI * 2); g.fill();
-  g.fillStyle = `rgba(255,90,31,${a})`;
-  g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
-}
 function strokePath(g, pts, steps, from, to, w, alphaFn) {
   let prev = crPoint(pts, from);
   for (let s = 1; s <= steps; s++) {
@@ -2694,123 +2690,6 @@ function arrowHead(g, from, to, size, color) {
   g.closePath();
   g.fill();
 }
-function drawGuide(g, P, guide, time, dpr) {
-  g.lineCap = 'round';
-  g.lineJoin = 'round';
-  const type = guide.type;
-  if (type === 'sweep' || type === 'neck') {
-    const paths = type === 'neck' ? neckPaths(P) : sidePaths(P, GUIDE_PATHS[guide.path]);
-    const period = guide.back ? 3.4 : 2.4;
-    let ph = (time % period) / period;
-    if (guide.back) ph = ph < 0.5 ? ph * 2 : 2 - ph * 2;
-    const head = easeIO(ph);
-    for (const pts of paths) {
-      g.setLineDash([2 * dpr, 5 * dpr]);
-      strokePath(g, pts, 24, 0, 1, 1.4 * dpr, () => 0.35);
-      g.setLineDash([]);
-      const from = Math.max(0, head - 0.38);
-      strokePath(g, pts, 16, from, head, 4 * dpr, k => 0.15 + 0.75 * k);
-      const p = crPoint(pts, head);
-      glowDot(g, p[0], p[1], 5.5 * dpr, 1);
-      if (!guide.back) {
-        const end = crPoint(pts, 1), pre = crPoint(pts, 0.94);
-        arrowHead(g, pre, end, 9 * dpr, 'rgba(255,90,31,.55)');
-      }
-    }
-  } else if (type === 'tap') {
-    const [a, b] = sidePaths(P, GUIDE_PATHS[guide.path]);
-    const rate = guide.slow ? 0.8 : 3;
-    const n = a.length;
-    const k = Math.floor(time * rate) % n;
-    const fr = (time * rate) % 1;
-    for (const pts of [a, b]) {
-      pts.forEach((p, i) => {
-        if (i === k) {
-          g.strokeStyle = `rgba(255,90,31,${1 - fr})`;
-          g.lineWidth = 2 * dpr;
-          g.beginPath(); g.arc(p[0], p[1], (5 + 14 * fr) * dpr, 0, Math.PI * 2); g.stroke();
-          glowDot(g, p[0], p[1], 5 * dpr, 1);
-        } else {
-          g.fillStyle = i < k ? 'rgba(255,90,31,.55)' : 'rgba(16,20,19,.25)';
-          g.beginPath(); g.arc(p[0], p[1], 3 * dpr, 0, Math.PI * 2); g.fill();
-        }
-      });
-    }
-  } else if (type === 'press' || type === 'circle') {
-    const v = GUIDE_PATHS[guide.at][0];
-    for (const i of [v, MESH_MIRROR[v]]) {
-      const p = P(i);
-      if (type === 'press') {
-        const ph = (time % 2.5) / 2.5;
-        const k = ph < 0.4 ? ph / 0.4 : ph < 0.8 ? 1 : 1 - (ph - 0.8) / 0.2;
-        g.strokeStyle = 'rgba(255,90,31,.6)';
-        g.lineWidth = 2 * dpr;
-        g.beginPath(); g.arc(p[0], p[1], (10 + 10 * k) * dpr, 0, Math.PI * 2); g.stroke();
-        const dir = i === v ? -1 : 1;
-        const tip = [p[0] + dir * 14 * dpr * k, p[1] - 26 * dpr * k];
-        g.strokeStyle = 'rgba(255,90,31,.9)';
-        g.lineWidth = 3 * dpr;
-        g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(tip[0], tip[1]); g.stroke();
-        arrowHead(g, p, [tip[0] + dir * 3 * dpr, tip[1] - 5 * dpr], 9 * dpr, 'rgba(255,90,31,.95)');
-        glowDot(g, p[0], p[1], 5 * dpr, 1);
-      } else {
-        const a = time * 2.6 * (i === v ? 1 : -1);
-        const r = 11 * dpr;
-        g.strokeStyle = 'rgba(255,90,31,.35)';
-        g.lineWidth = 1.5 * dpr;
-        g.beginPath(); g.arc(p[0], p[1], r, 0, Math.PI * 2); g.stroke();
-        glowDot(g, p[0] + Math.cos(a) * r, p[1] + Math.sin(a) * r, 4.5 * dpr, 1);
-      }
-    }
-  } else if (type === 'breath') {
-    const ph = (time % 8) / 8;
-    const k = ph < 0.5 ? easeIO(ph * 2) : 1 - easeIO((ph - 0.5) * 2);
-    for (const i of [GUIDE_PATHS.nostril[0], MESH_MIRROR[GUIDE_PATHS.nostril[0]]]) {
-      const p = P(i);
-      g.strokeStyle = `rgba(59,118,238,${0.25 + 0.5 * k})`;
-      g.lineWidth = 2 * dpr;
-      g.beginPath(); g.arc(p[0], p[1], (6 + 12 * k) * dpr, 0, Math.PI * 2); g.stroke();
-    }
-    const l = P(61), r = P(291), m = P(GUIDE_PATHS.lips[0]);
-    g.strokeStyle = 'rgba(255,90,31,.85)';
-    g.lineWidth = 3 * dpr;
-    g.beginPath(); g.moveTo(l[0], l[1]); g.quadraticCurveTo(m[0], m[1] - 4 * dpr, r[0], r[1]); g.stroke();
-    g.fillStyle = 'rgba(16,20,19,.75)';
-    g.font = `600 ${12 * dpr}px "Instrument Sans", system-ui, sans-serif`;
-    g.textAlign = 'center';
-    const nose = P(4);
-    g.fillText(ph < 0.5 ? 'einatmen' : 'ausatmen', nose[0], nose[1] - 30 * dpr);
-  } else if (type === 'blink') {
-    const ph = (time % 3) / 3;
-    for (const [a, b] of [[33, 133], [263, 362]]) {
-      const pa = P(a), pb = P(b);
-      const c = [(pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2];
-      g.strokeStyle = `rgba(255,90,31,${0.8 * (1 - ph)})`;
-      g.lineWidth = 2 * dpr;
-      g.beginPath(); g.ellipse(c[0], c[1], (14 + 20 * ph) * dpr, (8 + 12 * ph) * dpr, 0, 0, Math.PI * 2); g.stroke();
-    }
-  } else if (type === 'tuck') {
-    const chin = P(152), nose = P(1), e1 = P(234), e2 = P(454);
-    const ear = [(e1[0] + e2[0]) / 2, (e1[1] + e2[1]) / 2];
-    let dx = ear[0] - nose[0], dy = ear[1] - nose[1];
-    const L = Math.hypot(dx, dy) || 1;
-    dx /= L; dy /= L;
-    const ph = (time % 3.4) / 3.4;
-    const k = ph < 0.25 ? easeIO(ph / 0.25) : ph < 0.7 ? 1 : 1 - easeIO((ph - 0.7) / 0.3);
-    const start = [chin[0] - dx * 46 * dpr, chin[1] + 18 * dpr];
-    const len = (34 + 30 * k) * dpr;
-    const end = [start[0] + dx * len, start[1] + dy * len * 0.25];
-    g.strokeStyle = 'rgba(255,90,31,.95)';
-    g.lineWidth = 5 * dpr;
-    g.beginPath(); g.moveTo(start[0], start[1]); g.lineTo(end[0], end[1]); g.stroke();
-    arrowHead(g, start, [end[0] + dx * 8 * dpr, end[1] + dy * 2 * dpr], 15 * dpr, 'rgba(255,90,31,1)');
-    glowDot(g, chin[0], chin[1], 5 * dpr, 0.9);
-    g.fillStyle = 'rgba(16,20,19,.8)';
-    g.font = `700 ${13 * dpr}px "Instrument Sans", system-ui, sans-serif`;
-    g.textAlign = 'center';
-    g.fillText(ph > 0.25 && ph < 0.7 ? 'halten' : 'Kinn zurück', (start[0] + end[0]) / 2, start[1] + 24 * dpr);
-  }
-}
 function drawGuideStatic(g, P, guide, w) {
   const dpr = w / 120;
   g.lineCap = 'round';
@@ -2829,22 +2708,6 @@ function drawGuideStatic(g, P, guide, w) {
   }
 }
 /* View changes a move needs (profile view for chin tucks, side tilt for the neck). */
-function guideView(guide, time, v) {
-  if (!guide) return;
-  if (guide.type === 'tuck') {
-    v.yaw = 0.82 + Math.sin(time * 0.4) * 0.05;
-    const ph = (time % 3.4) / 3.4;
-    const k = ph < 0.25 ? easeIO(ph / 0.25) : ph < 0.7 ? 1 : 1 - easeIO((ph - 0.7) / 0.3);
-    v.tx = (v.tx || 0) - Math.sin(v.yaw) * 0.07 * k;
-    v.dist = (v.dist || 2.75) + Math.cos(v.yaw) * 0.07 * k;
-    v.pitch = (v.pitch || 0) + 0.05 * k;
-  } else if (guide.type === 'tilt') {
-    v.roll = Math.sin(time * (Math.PI * 2) / 6) * 0.3;
-    v.yaw = (v.yaw || 0) * 0.3;
-  } else {
-    v.yaw = (v.yaw || 0) * 0.45;
-  }
-}
 
 /* ============================== Coach orb: a sphere of dots ============================== */
 const ORB_PTS = (() => {
@@ -3032,6 +2895,522 @@ function createScanView(canvas) {
   };
   addLooper(sv);
   return sv;
+}
+
+/* ============================== Exercise demos: a calm model that shows every move ============================== */
+/* Drawn in a 100 x 100 scene. Front view for the face work, side view where the movement goes front to back. */
+const DM = {
+  skin: '#EBC9AF', skinHi: '#F7E1CF', skinLo: '#D5A98B', skinLine: 'rgba(150,100,72,.55)',
+  hair: '#3B312C', shirt: '#2A302E', shirtHi: '#3A423F', lip: '#C78677', iris: '#4B3A31', white: '#FBF8F5',
+};
+const demoEase = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+const dLerp = (a, b, k) => a + (b - a) * k;
+const dMix = (p, q, k) => [dLerp(p[0], q[0], k), dLerp(p[1], q[1], k)];
+/* Timeline helper: [[name, seconds], ...] looped. */
+function demoSeq(t, segs) {
+  const total = segs.reduce((s, x) => s + x[1], 0);
+  let r = ((t % total) + total) % total;
+  for (let i = 0; i < segs.length; i++) {
+    const [name, d] = segs[i];
+    if (r < d) return { name, k: r / d, e: r, d, i, loop: Math.floor(t / total) };
+    r -= d;
+  }
+  const l = segs[segs.length - 1];
+  return { name: l[0], k: 1, e: l[1], d: l[1], i: segs.length - 1, loop: 0 };
+}
+const holdCue = (txt, s) => `${txt} · ${Math.max(1, Math.ceil(s.d - s.e))}`;
+function quadPt(a, c, b, k) { const u = 1 - k; return [u * u * a[0] + 2 * u * k * c[0] + k * k * b[0], u * u * a[1] + 2 * u * k * c[1] + k * k * b[1]]; }
+
+/* ---------- Moves: each returns the pose at time t ---------- */
+const DEMO_MOVES = {
+  tuck(t) {
+    const s = demoSeq(t, [['in', 1.3], ['hold', 3], ['out', 1.1], ['rest', 0.8]]);
+    const v = s.name === 'in' ? demoEase(s.k) : s.name === 'hold' ? 1 : s.name === 'out' ? 1 - demoEase(s.k) : 0;
+    const cue = s.name === 'in' ? 'Kinn gerade nach hinten schieben' : s.name === 'hold' ? holdCue('Halten', s) : s.name === 'out' ? 'Langsam lösen' : 'Und nochmal';
+    return { view: 'side', tuck: v, ghost: v > 0.05, eyes: 0.9, cue };
+  },
+  jawSweep(t) {
+    const s = demoSeq(t, [['open', 1], ['move', 4.4], ['close', 0.9]]);
+    let jo = 0, jx = 0;
+    if (s.name === 'open') jo = demoEase(s.k);
+    else if (s.name === 'move') { jo = 1; jx = Math.sin(s.e / s.d * Math.PI * 4) * 3.4; }
+    else jo = 1 - demoEase(s.k);
+    const cue = s.name === 'open' ? 'Mund leicht öffnen' : s.name === 'move' ? (Math.cos(s.e / s.d * Math.PI * 4) > 0 ? 'Unterkiefer locker zur Seite' : 'Und zur anderen Seite') : 'Mund schließen';
+    return { view: 'front', jo: jo * 1.9, jx, mouth: jo * 0.75, eyes: 1, cue };
+  },
+  breath(t) {
+    const s = demoSeq(t, [['tongue', 2], ['in', 3], ['out', 3.4]]);
+    const tg = s.name === 'tongue' ? demoEase(Math.min(1, s.k * 1.4)) : 1;
+    const br = s.name === 'in' ? demoEase(s.k) : s.name === 'out' ? 1 - demoEase(s.k) : 0;
+    const flow = s.name === 'in' ? -1 : s.name === 'out' ? 1 : 0;
+    const cue = s.name === 'tongue' ? 'Zunge flach an den Gaumen' : s.name === 'in' ? 'Durch die Nase einatmen' : 'Langsam ausatmen';
+    return { view: 'side', tongue: tg, cut: 1, breath: br, flow, flowK: s.k, eyes: 0, cue };
+  },
+  tilt(t) {
+    const s = demoSeq(t, [['a', 1.5], ['ah', 3], ['ab', 1.2], ['b', 1.5], ['bh', 3], ['bb', 1.2]]);
+    let v = 0;
+    if (s.name === 'a') v = demoEase(s.k); else if (s.name === 'ah') v = 1; else if (s.name === 'ab') v = 1 - demoEase(s.k);
+    else if (s.name === 'b') v = -demoEase(s.k); else if (s.name === 'bh') v = -1; else v = -(1 - demoEase(s.k));
+    const cue = s.name === 'a' || s.name === 'b' ? 'Ohr Richtung Schulter neigen' : s.name === 'ah' || s.name === 'bh' ? holdCue('Halten, Schulter bleibt unten', s) : s.name === 'ab' ? 'Zurück zur Mitte, andere Seite' : 'Zurück zur Mitte';
+    return { view: 'front', tilt: v * 0.36, eyes: 0, cue };
+  },
+  cheek(t) {
+    return strokeMove(t, [45.6, 48.8], [41, 49.2], [35.8, 46.2], -78, 'two', ['Zwei Finger neben die Nase', 'Langsam zum Ohr streichen', 'Finger abheben', 'Zurück und wiederholen']);
+  },
+  jaw(t) {
+    return strokeMove(t, [46.5, 63.6], [39.6, 61.5], [35.8, 53.2], -62, 'two', ['Finger ans Kinn', 'Die Kieferlinie entlang zum Ohr', 'Finger abheben', 'Zurück und wiederholen']);
+  },
+  neck(t) {
+    return strokeMove(t, [37.8, 54.5], [41, 66], [43, 77], -84, 'palm', ['Hände unter die Ohren', 'Am Hals entlang nach unten', 'Hände abheben', 'Wieder oben ansetzen']);
+  },
+  lift(t) {
+    const s = demoSeq(t, [['place', 1], ['push', 1.2], ['hold', 5], ['off', 1.1]]);
+    const a = [42.2, 55.2], b = [40.2, 51.4];
+    let p = a, on = true, lift = 0;
+    if (s.name === 'place') { p = dMix([a[0] - 2, a[1] + 7], a, demoEase(s.k)); on = s.k > 0.7; }
+    else if (s.name === 'push') { p = dMix(a, b, demoEase(s.k)); lift = demoEase(s.k); }
+    else if (s.name === 'hold') { p = b; lift = 1; }
+    else { p = dMix(b, [b[0] - 2, b[1] + 8], demoEase(s.k)); on = s.k < 0.25; lift = 1 - demoEase(Math.min(1, s.k * 2)); }
+    const cue = s.name === 'place' ? 'Handflächen auf die Wangen' : s.name === 'push' ? 'Sanft nach oben und außen' : s.name === 'hold' ? holdCue('Halten', s) : 'Lösen';
+    return { view: 'front', eyes: 0, cheek: lift, hands: mirrored({ tip: p, ang: -100, pose: 'palm', on }), cue };
+  },
+  under(t) {
+    const pts = [[45.2, 45.3], [43.4, 45.6], [41.6, 45.6], [39.9, 45.3], [38.4, 44.6]];
+    const per = 0.42, n = pts.length;
+    const cyc = per * n + 0.7;
+    const r = t % cyc;
+    let p = pts[n - 1], up = 1, ripple = -1;
+    if (r < per * n) {
+      const i = Math.floor(r / per), f = (r % per) / per;
+      p = pts[i];
+      up = f < 0.35 ? 0 : Math.sin((f - 0.35) / 0.65 * Math.PI);
+      ripple = f < 0.5 ? f / 0.5 : -1;
+    }
+    const tip = [p[0] - up * 0.8, p[1] + up * 1.6];
+    return { view: 'front', eyes: 0, hands: mirrored({ tip, ang: -72, pose: 'ring', on: up < 0.15, ripple }), cue: 'Ganz leicht klopfen, von innen nach außen' };
+  },
+  brow(t) {
+    const spots = [[46.4, 37.4], [43, 36.5], [39.7, 36.9]];
+    const s = demoSeq(t, [['p0', 2], ['m0', 0.7], ['p1', 2], ['m1', 0.7], ['p2', 2], ['m2', 1]]);
+    const idx = Number(s.name[1]);
+    let p, press = 0;
+    if (s.name[0] === 'p') { p = spots[idx]; press = Math.sin(Math.min(1, s.k * 1.25) * Math.PI); }
+    else { const from = spots[idx], to = spots[(idx + 1) % 3]; p = idx === 2 ? dMix(from, to, demoEase(s.k)) : dMix(from, to, demoEase(s.k)); p = [p[0], p[1] + Math.sin(s.k * Math.PI) * 1.6]; }
+    const cue = s.name[0] === 'p' ? holdCue('Sanft drücken', s) : idx === 2 ? 'Wieder innen anfangen' : 'Ein Stück nach außen';
+    return { view: 'front', eyes: 0, brow: press * 1.1, hands: mirrored({ tip: [p[0], p[1] - press * 0.5], ang: -66, pose: 'thumb', on: s.name[0] === 'p', elbow: [-6, 130] }), cue };
+  },
+  blink(t) {
+    const s = demoSeq(t, [['far', 4.5], ['blink', 2.4]]);
+    let eyes = 1;
+    if (s.name === 'blink') { const f = (s.e % 0.8) / 0.8; eyes = f < 0.25 ? 1 - Math.sin(f / 0.25 * Math.PI) : 1; }
+    return { view: 'front', eyes, gaze: [0, -0.2], far: s.name === 'far' ? 1 : 0, cue: s.name === 'far' ? 'In die Ferne schauen' : 'Ein paar Mal bewusst blinzeln' };
+  },
+  fore(t) {
+    return strokeMove(t, [48.6, 28.6], [42, 29.6], [35.5, 34.6], -18, 'three', ['Fingerspitzen in die Stirnmitte', 'Langsam zu den Schläfen streichen', 'Finger abheben', 'Zurück zur Mitte'], [-4, 92]);
+  },
+  temple(t) {
+    const a = t * Math.PI * 2 / 1.3;
+    const tip = [34.6 + Math.cos(a) * 1.3, 37.5 + Math.sin(a) * 1.3];
+    return { view: 'front', eyes: 0, jo: 0.3, hands: mirrored({ tip, ang: -22, pose: 'three', on: true, elbow: [-4, 92] }), cue: 'Kleine Kreise, Kiefer locker lassen' };
+  },
+};
+/* Stroke along a curve with two hands: place, stroke, lift, return. */
+function strokeMove(t, a, c, b, ang, pose, cues, elbow) {
+  const s = demoSeq(t, [['place', 0.8], ['stroke', 2.1], ['lift', 0.5], ['back', 0.9]]);
+  let p, on = true;
+  if (s.name === 'place') { p = dMix([a[0] - 1.5, a[1] + 3], a, demoEase(s.k)); on = s.k > 0.6; }
+  else if (s.name === 'stroke') p = quadPt(a, c, b, demoEase(s.k));
+  else if (s.name === 'lift') { p = dMix(b, [b[0] - 1.5, b[1] + 3], demoEase(s.k)); on = false; }
+  else { p = dMix([b[0] - 1.5, b[1] + 3], [a[0] - 1.5, a[1] + 3], demoEase(s.k)); on = false; }
+  const cue = cues[['place', 'stroke', 'lift', 'back'].indexOf(s.name)];
+  return { view: 'front', eyes: 0, hands: mirrored({ tip: p, ang, pose, on, elbow }), cue };
+}
+function mirrored(h) { const e = h.elbow || [6, 140]; return [{ ...h, elbow: e, side: -1 }, { ...h, tip: [100 - h.tip[0], h.tip[1]], ang: 180 - h.ang, elbow: [100 - e[0], e[1]], side: 1 }]; }
+/* Which demo belongs to which routine step. */
+function demoKey(g) {
+  if (!g) return 'cheek';
+  if (g.type === 'tuck') return 'tuck';
+  if (g.type === 'breath') return 'breath';
+  if (g.type === 'tilt') return 'tilt';
+  if (g.type === 'neck') return 'neck';
+  if (g.type === 'blink') return 'blink';
+  if (g.type === 'circle') return 'temple';
+  if (g.type === 'press') return 'lift';
+  if (g.type === 'tap') return g.path === 'brow' ? 'brow' : 'under';
+  if (g.type === 'sweep') return g.back ? 'jawSweep' : g.path === 'jaw' ? 'jaw' : g.path === 'fore' ? 'fore' : 'cheek';
+  return 'cheek';
+}
+const DEMO_THUMB_T = { tuck: 2.5, jawSweep: 1.6, breath: 3.5, tilt: 2.5, cheek: 1.8, jaw: 1.8, neck: 1.8, lift: 3, under: 0.2, brow: 1, blink: 1, fore: 1.8, temple: 0.4 };
+
+/* ---------- Drawing ---------- */
+function demoPaint(g, W, H, pose, time) {
+  const s = Math.min(W / 100, H / 100) * (H > W * 1.15 ? 1.06 : 1);
+  g.save();
+  g.translate((W - 100 * s) / 2, (H - 100 * s) / 2 + (H > W * 1.15 ? -H * 0.02 : 0));
+  g.scale(s, s);
+  g.lineJoin = 'round';
+  g.lineCap = 'round';
+  if (pose.view === 'side') paintSide(g, pose, time); else paintFront(g, pose, time);
+  if (pose.hands) for (const h of pose.hands) paintHand(g, h);
+  g.restore();
+}
+function skinFill(g, x, y, r) {
+  const gr = g.createRadialGradient(x - r * 0.25, y - r * 0.35, r * 0.1, x, y, r * 1.15);
+  gr.addColorStop(0, DM.skinHi); gr.addColorStop(0.55, DM.skin); gr.addColorStop(1, DM.skinLo);
+  return gr;
+}
+function paintBust(g, rise) {
+  g.save();
+  g.translate(0, -rise);
+  g.fillStyle = skinFill(g, 50, 70, 14);
+  g.beginPath();
+  g.moveTo(42.6, 57); g.lineTo(57.4, 57);
+  g.bezierCurveTo(57.6, 66, 58.5, 73, 60.5, 79); g.lineTo(39.5, 79);
+  g.bezierCurveTo(41.5, 73, 42.4, 66, 42.6, 57); g.fill();
+  const sh = g.createLinearGradient(0, 76, 0, 100);
+  sh.addColorStop(0, DM.shirtHi); sh.addColorStop(1, DM.shirt);
+  g.fillStyle = sh;
+  g.beginPath();
+  g.moveTo(2, 140); g.lineTo(3, 101); g.bezierCurveTo(5, 88, 12, 82.5, 26, 80.2);
+  g.bezierCurveTo(33, 79, 38, 77.6, 41, 76.6);
+  g.bezierCurveTo(44, 80.6, 56, 80.6, 59, 76.6);
+  g.bezierCurveTo(62, 77.6, 67, 79, 74, 80.2);
+  g.bezierCurveTo(88, 82.5, 95, 88, 97, 101); g.lineTo(98, 140); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 0.6;
+  g.beginPath(); g.moveTo(41, 76.6); g.bezierCurveTo(44, 80.6, 56, 80.6, 59, 76.6); g.stroke();
+  g.restore();
+}
+function paintFront(g, p, time) {
+  const jx = p.jx || 0, jo = p.jo || 0, tilt = p.tilt || 0;
+  paintBust(g, 0);
+  // shade under the chin on the neck
+  g.save();
+  g.translate(50, 66); g.rotate(tilt); g.translate(-50, -66);
+  const sh = g.createLinearGradient(0, 60, 0, 70);
+  sh.addColorStop(0, 'rgba(140,86,60,.32)'); sh.addColorStop(1, 'rgba(140,86,60,0)');
+  g.fillStyle = sh; g.fillRect(42.8, 58, 14.4, 12);
+  // ears
+  for (const x of [33.2, 66.8]) {
+    g.fillStyle = DM.skinLo;
+    g.beginPath(); g.ellipse(x, 44.5, 2.9, 5.4, x < 50 ? 0.12 : -0.12, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(150,95,70,.35)';
+    g.beginPath(); g.ellipse(x + (x < 50 ? 0.6 : -0.6), 44.8, 1.3, 3.2, 0, 0, Math.PI * 2); g.fill();
+  }
+  // head
+  g.fillStyle = skinFill(g, 50, 40, 24);
+  g.beginPath();
+  g.moveTo(33.6, 40);
+  g.bezierCurveTo(33.2, 26, 40.2, 18.6, 50, 18.6);
+  g.bezierCurveTo(59.8, 18.6, 66.8, 26, 66.4, 40);
+  g.bezierCurveTo(66.2, 47.2, 64.8 + jx * 0.3, 53.4, 61.5 + jx * 0.6, 58.6 + jo * 0.55);
+  g.bezierCurveTo(58.6 + jx, 62.6 + jo, 54.6 + jx, 65 + jo, 50 + jx, 65 + jo);
+  g.bezierCurveTo(45.4 + jx, 65 + jo, 41.4 + jx, 62.6 + jo, 38.5 + jx * 0.6, 58.6 + jo * 0.55);
+  g.bezierCurveTo(35.2 + jx * 0.3, 53.4, 33.8, 47.2, 33.6, 40);
+  g.closePath(); g.fill();
+  // cheeks
+  const lift = p.cheek || 0;
+  for (const x of [40.5, 59.5]) {
+    const c = g.createRadialGradient(x, 52 - lift, 0.5, x, 52 - lift, 6.5);
+    c.addColorStop(0, 'rgba(226,128,112,.22)'); c.addColorStop(1, 'rgba(226,128,112,0)');
+    g.fillStyle = c; g.beginPath(); g.arc(x, 52 - lift, 6.5, 0, Math.PI * 2); g.fill();
+  }
+  // hair, a short neat cut
+  g.fillStyle = DM.hair;
+  g.beginPath();
+  g.moveTo(33.3, 39.5);
+  g.bezierCurveTo(31.6, 25, 39.5, 15.4, 50.5, 15.6);
+  g.bezierCurveTo(61.5, 15.8, 68.6, 25, 66.7, 39.5);
+  g.bezierCurveTo(65.6, 33.5, 64.6, 29.6, 62.2, 27.4);
+  g.bezierCurveTo(57.5, 24.6, 46, 25.8, 39, 27.2);
+  g.bezierCurveTo(35.6, 29.6, 34.4, 33.6, 33.3, 39.5);
+  g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = 0.7;
+  g.beginPath(); g.moveTo(40, 19.5); g.bezierCurveTo(46, 17.4, 55, 17.6, 61, 20.6); g.stroke();
+  // brows
+  const bu = (p.brow || 0) + (p.far ? 0.3 : 0);
+  g.strokeStyle = DM.hair; g.lineWidth = 1.5;
+  for (const sd of [-1, 1]) {
+    const x0 = 50 + sd * 3.8, x1 = 50 + sd * 12.2;
+    g.beginPath(); g.moveTo(x0, 35.3 - bu); g.quadraticCurveTo(50 + sd * 8.2, 33.3 - bu * 1.2, x1, 35 - bu * 0.6); g.stroke();
+  }
+  // eyes
+  const open = clamp(p.eyes == null ? 1 : p.eyes, 0, 1) * (1 - lift * 0.25);
+  const gz = p.gaze || [0, 0];
+  for (const sd of [-1, 1]) {
+    const cx = 50 + sd * 8, cy = 41.4 - lift * 0.4;
+    if (open < 0.12) {
+      g.strokeStyle = 'rgba(70,48,38,.85)'; g.lineWidth = 0.75;
+      g.beginPath(); g.moveTo(cx - 3.6, cy); g.quadraticCurveTo(cx, cy + 1.6, cx + 3.6, cy); g.stroke();
+      g.lineWidth = 0.45;
+      for (const k of [-0.6, 0, 0.6]) { const x = cx + sd * (1.6 + k * 1.6); g.beginPath(); g.moveTo(x, cy + 1.05 - Math.abs(k) * 0.4); g.lineTo(x + sd * 0.35, cy + 1.7 - Math.abs(k) * 0.4); g.stroke(); }
+    } else {
+      const ry = 2.1 * open;
+      g.save();
+      g.beginPath();
+      g.moveTo(cx - 3.8, cy);
+      g.bezierCurveTo(cx - 2.2, cy - ry * 1.15, cx + 2.2, cy - ry * 1.15, cx + 3.8, cy);
+      g.bezierCurveTo(cx + 2.2, cy + ry * 0.95, cx - 2.2, cy + ry * 0.95, cx - 3.8, cy);
+      g.closePath();
+      g.fillStyle = DM.white; g.fill();
+      g.clip();
+      g.fillStyle = DM.iris; g.beginPath(); g.arc(cx + gz[0], cy + gz[1] * 2, 1.75, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#1C1512'; g.beginPath(); g.arc(cx + gz[0], cy + gz[1] * 2, 0.75, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.arc(cx + gz[0] + 0.55, cy + gz[1] * 2 - 0.6, 0.38, 0, Math.PI * 2); g.fill();
+      g.restore();
+      g.strokeStyle = 'rgba(70,48,38,.9)'; g.lineWidth = 0.7;
+      g.beginPath(); g.moveTo(cx - 3.8, cy); g.bezierCurveTo(cx - 2.2, cy - ry * 1.15, cx + 2.2, cy - ry * 1.15, cx + 3.8, cy); g.stroke();
+    }
+  }
+  // nose
+  g.strokeStyle = 'rgba(160,104,78,.55)'; g.lineWidth = 0.75;
+  g.beginPath(); g.moveTo(48.2, 43); g.bezierCurveTo(47.4, 47, 46.8, 49.6, 47.6, 51); g.stroke();
+  g.beginPath(); g.moveTo(47.2, 51.3); g.quadraticCurveTo(50, 53, 52.8, 51.3); g.stroke();
+  g.fillStyle = 'rgba(255,255,255,.28)'; g.beginPath(); g.ellipse(50.6, 46, 0.8, 3.4, 0, 0, Math.PI * 2); g.fill();
+  // mouth
+  const m = p.mouth || 0, mx = 50 + jx * 0.75, my = 57.4 + jo * 0.45;
+  if (m > 0.05) {
+    g.fillStyle = '#6E3A33';
+    g.beginPath(); g.ellipse(mx, my + m * 0.9, 3.7, m * 2.2 + 0.5, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#F4EEE8'; g.beginPath(); g.ellipse(mx, my - 0.2, 2.8, 0.55, 0, 0, Math.PI); g.fill();
+    g.strokeStyle = DM.lip; g.lineWidth = 0.9;
+    g.beginPath(); g.ellipse(mx, my + m * 0.9, 3.9, m * 2.2 + 0.7, 0, 0, Math.PI * 2); g.stroke();
+  } else {
+    g.fillStyle = 'rgba(199,134,119,.55)'; g.beginPath(); g.ellipse(mx, my + 0.9, 3, 1.05, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = DM.lip; g.lineWidth = 0.9;
+    g.beginPath(); g.moveTo(mx - 4, my); g.quadraticCurveTo(mx - 1.6, my + 0.7, mx, my + 0.15); g.quadraticCurveTo(mx + 1.6, my + 0.7, mx + 4, my); g.stroke();
+  }
+  g.restore();
+  if (p.far) {
+    // a little hint that the gaze goes far away
+    g.fillStyle = `rgba(16,20,19,${0.12 + 0.08 * Math.sin(time * 2)})`;
+    for (let i = 0; i < 3; i++) { const x = 50 + (i - 1) * 4; g.beginPath(); g.arc(x, 9.5, 0.9, 0, Math.PI * 2); g.fill(); }
+  }
+}
+function paintSide(g, p, time) {
+  const tk = p.tuck || 0, tx = -5.2 * tk, ty = 0.5 * tk, br = (p.breath || 0) * 1.1;
+  if (p.ghost) {
+    // where the head started, very faint
+    g.save(); g.globalAlpha = 0.16 * Math.min(1, tk * 3);
+    sideHeadPath(g, 0, 0); g.fillStyle = DM.skinLo; g.fill();
+    g.restore();
+  }
+  // shoulders and back
+  g.save(); g.translate(0, -br);
+  const sh = g.createLinearGradient(0, 78, 0, 100);
+  sh.addColorStop(0, DM.shirtHi); sh.addColorStop(1, DM.shirt);
+  g.fillStyle = sh;
+  g.beginPath();
+  g.moveTo(22, 140); g.lineTo(24, 101); g.bezierCurveTo(24, 90, 28, 83, 38, 79.6);
+  g.lineTo(58, 79.8); g.bezierCurveTo(68, 82, 74, 88, 76, 101); g.lineTo(78, 140); g.closePath(); g.fill();
+  g.restore();
+  // neck, it straightens when the chin goes back
+  g.fillStyle = skinFill(g, 49, 70, 14);
+  g.beginPath();
+  g.moveTo(41.5 + tx, 55 + ty);
+  g.bezierCurveTo(41 + tx * 0.6, 64, 40.5, 72, 40, 80 - br);
+  g.lineTo(57, 80 - br);
+  g.bezierCurveTo(56.5, 74, 55.5 + tx * 0.5, 68, 55.5 + tx, 61.5 + ty);
+  g.closePath(); g.fill();
+  g.save();
+  g.translate(tx, ty);
+  sideHeadPath(g, 0, 0);
+  g.fillStyle = skinFill(g, 52, 38, 24); g.fill();
+  // double chin fold when tucked
+  if (tk > 0.3) {
+    g.strokeStyle = `rgba(150,96,70,${(tk - 0.3) * 0.9})`; g.lineWidth = 0.8;
+    g.beginPath(); g.moveTo(63.6, 61.6); g.quadraticCurveTo(60, 63.6, 56, 63); g.stroke();
+  }
+  // ear
+  g.fillStyle = DM.skinLo; g.beginPath(); g.ellipse(45.2, 43.5, 3, 5.2, -0.15, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(150,95,70,.4)'; g.beginPath(); g.ellipse(45.6, 43.8, 1.3, 3, -0.15, 0, Math.PI * 2); g.fill();
+  // hair
+  g.fillStyle = DM.hair;
+  g.beginPath();
+  g.moveTo(31.2, 46);
+  g.bezierCurveTo(28.6, 32, 34.5, 16.5, 49, 16);
+  g.bezierCurveTo(58.6, 15.8, 64.6, 20.6, 65.2, 27);
+  g.bezierCurveTo(60, 24.8, 54.8, 25.4, 50.5, 27.6);
+  g.bezierCurveTo(46.4, 30.4, 42.6, 35.6, 41.6, 40.2);
+  g.bezierCurveTo(38.2, 43.6, 34.6, 45.6, 31.2, 46);
+  g.closePath(); g.fill();
+  // brow and eye
+  g.strokeStyle = DM.hair; g.lineWidth = 1.4;
+  g.beginPath(); g.moveTo(59.4, 35.2); g.quadraticCurveTo(62.4, 34, 64.8, 35.2); g.stroke();
+  const open = p.eyes == null ? 1 : p.eyes;
+  if (open > 0.2) {
+    g.fillStyle = DM.white; g.beginPath(); g.moveTo(60.2, 40); g.quadraticCurveTo(62.4, 38.4, 64.4, 39.7); g.quadraticCurveTo(62.6, 41.4, 60.2, 40); g.fill();
+    g.fillStyle = DM.iris; g.beginPath(); g.arc(63.2, 39.8, 1, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(70,48,38,.9)'; g.lineWidth = 0.6; g.beginPath(); g.moveTo(60.2, 40); g.quadraticCurveTo(62.4, 38.4, 64.4, 39.7); g.stroke();
+  } else {
+    g.strokeStyle = 'rgba(70,48,38,.85)'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(60.2, 40); g.quadraticCurveTo(62.2, 41.2, 64.2, 40); g.stroke();
+  }
+  // lips
+  g.strokeStyle = DM.lip; g.lineWidth = 0.8;
+  g.beginPath(); g.moveTo(67.5, 51.5); g.lineTo(64.8, 51.6); g.stroke();
+  if (p.cut) paintMouthInside(g, p, time);
+  g.restore();
+}
+function sideHeadPath(g) {
+  g.beginPath();
+  g.moveTo(48, 17.2);
+  g.bezierCurveTo(58.5, 17, 65.6, 24, 65.6, 32.6);
+  g.bezierCurveTo(65.6, 34.6, 66.2, 36.2, 66.6, 37.8);
+  g.bezierCurveTo(67.6, 40.6, 70.2, 44, 70.8, 46.3);
+  g.bezierCurveTo(71, 47.5, 69.6, 48.3, 67.8, 48.2);
+  g.bezierCurveTo(68.5, 49.4, 68.5, 50.6, 67.7, 51.4);
+  g.bezierCurveTo(68.4, 52.4, 68.2, 53.6, 67, 54.3);
+  g.bezierCurveTo(67.2, 56, 67.6, 58.6, 66.2, 60.4);
+  g.bezierCurveTo(64.4, 62.6, 59, 63, 55.2, 62);
+  g.bezierCurveTo(51.5, 60.8, 47, 58.4, 42.2, 56);
+  g.bezierCurveTo(36, 54.6, 31.4, 49, 30.6, 41.2);
+  g.bezierCurveTo(30, 27.6, 37.6, 17.4, 48, 17.2);
+  g.closePath();
+}
+/* Cut-away of the mouth for the tongue rest: palate, tongue and the air through the nose. */
+function paintMouthInside(g, p, time) {
+  const tg = p.tongue || 0;
+  g.save();
+  sideHeadPath(g); g.clip();
+  g.fillStyle = 'rgba(110,58,51,.2)';
+  g.beginPath(); g.ellipse(58.6, 52, 5.6, 3.3, 0, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(110,58,51,.6)'; g.lineWidth = 0.8;
+  g.beginPath(); g.moveTo(53.4, 50.8); g.quadraticCurveTo(58.6, 48, 63.8, 49.7); g.stroke();
+  const top = dLerp(53.8, 49.6, tg);
+  g.fillStyle = '#D97C7A';
+  g.beginPath();
+  g.moveTo(53.6, 55.2);
+  g.bezierCurveTo(54, top + 0.5, 57.6, top - 0.5, 60.6, top + 0.1);
+  g.bezierCurveTo(62.6, top + 0.5, 63.6, top + 1.4, 63.2, 53.8);
+  g.bezierCurveTo(61, 55.1, 56.6, 55.6, 53.6, 55.2);
+  g.closePath(); g.fill();
+  g.restore();
+  if (p.flow) {
+    for (let i = 0; i < 4; i++) {
+      let f = ((p.flowK || 0) * 2 + i / 4) % 1;
+      if (p.flow < 0) f = 1 - f;
+      const x = 70 + f * 9, y = 48.4 + f * 1.8;
+      g.fillStyle = `rgba(90,140,200,${0.45 * Math.sin(f * Math.PI)})`;
+      g.beginPath(); g.arc(x, y, 0.9 + f * 0.6, 0, Math.PI * 2); g.fill();
+    }
+  }
+}
+/* A hand seen from the back. Fingers point along `ang` (degrees); the chosen finger tip lands on `tip`. */
+const DEMO_HAND = { fingers: [[-2.55, 6.7], [-0.85, 7.1], [0.85, 6.6], [2.5, 5.3]], scale: 1.42 };
+function paintHand(g, h) {
+  const a = h.ang * Math.PI / 180, sy = h.side || 1, HS = DEMO_HAND.scale;
+  const ext = { two: [0, 1], three: [0, 1, 2], palm: [0, 1, 2, 3], ring: [2], thumb: [] }[h.pose] || [0, 1];
+  const lead = h.pose === 'ring' ? 2 : h.pose === 'thumb' ? -1 : h.pose === 'palm' ? 1 : h.pose === 'three' ? 1 : 0;
+  let lx, ly;
+  if (lead < 0) { lx = 4.8; ly = -1.4 * sy; } else { lx = DEMO_HAND.fingers[lead][1]; ly = DEMO_HAND.fingers[lead][0] * sy; }
+  const ca = Math.cos(a), sa = Math.sin(a);
+  const wx = h.tip[0] - (ca * lx - sa * ly) * HS, wy = h.tip[1] - (sa * lx + ca * ly) * HS;
+  // soft glow where the skin is touched
+  if (h.on) {
+    const gl = g.createRadialGradient(h.tip[0], h.tip[1], 0, h.tip[0], h.tip[1], 3.6);
+    gl.addColorStop(0, 'rgba(255,255,255,.8)'); gl.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gl; g.beginPath(); g.arc(h.tip[0], h.tip[1], 3.6, 0, Math.PI * 2); g.fill();
+  }
+  if (h.ripple != null && h.ripple >= 0) {
+    g.strokeStyle = `rgba(255,255,255,${0.9 * (1 - h.ripple)})`; g.lineWidth = 0.55;
+    g.beginPath(); g.arc(h.tip[0], h.tip[1], 1 + h.ripple * 3.4, 0, Math.PI * 2); g.stroke();
+  }
+  // forearm from the wrist down to an elbow outside the picture
+  const wr = [wx + ca * -8 * HS, wy + sa * -8 * HS];
+  const el = h.elbow || [h.side < 0 ? 6 : 94, 140];
+  const dx = el[0] - wr[0], dy = el[1] - wr[1], dl = Math.hypot(dx, dy) || 1;
+  const nx = -dy / dl, ny = dx / dl;
+  const w0 = 3.3 * HS * 0.95, w1 = 4.6 * HS;
+  const arm = g.createLinearGradient(wr[0] + nx * w0, wr[1] + ny * w0, wr[0] - nx * w0, wr[1] - ny * w0);
+  arm.addColorStop(0, DM.skinLo); arm.addColorStop(0.45, DM.skin); arm.addColorStop(1, DM.skinLo);
+  g.fillStyle = arm;
+  g.strokeStyle = DM.skinLine; g.lineWidth = 0.35;
+  g.beginPath();
+  g.moveTo(wr[0] + nx * w0, wr[1] + ny * w0);
+  g.lineTo(el[0] + nx * w1, el[1] + ny * w1);
+  g.lineTo(el[0] - nx * w1, el[1] - ny * w1);
+  g.lineTo(wr[0] - nx * w0, wr[1] - ny * w0);
+  g.closePath(); g.fill(); g.stroke();
+  g.save();
+  g.translate(wx, wy);
+  g.rotate(a);
+  g.scale(HS, HS * sy);
+  g.lineWidth = 0.3;
+  const capsule = (x0, y0, x1, y1, w, col) => {
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1);
+    g.lineWidth = w + 0.42; g.strokeStyle = DM.skinLine; g.stroke();
+    g.lineWidth = w; g.strokeStyle = col; g.stroke();
+  };
+  // thumb
+  if (h.pose === 'thumb') capsule(-4.2, -2.4, 4.8, -1.4, 2.1, DM.skinHi);
+  else capsule(-7.4, -3.2, -4.4, -4.5, 2.1, DM.skinLo);
+  // palm
+  const fill = g.createLinearGradient(-8, -4, 2, 4);
+  fill.addColorStop(0, DM.skin); fill.addColorStop(1, DM.skinHi);
+  g.fillStyle = fill; g.strokeStyle = DM.skinLine; g.lineWidth = 0.3;
+  g.beginPath();
+  g.moveTo(-8.6, -3); g.quadraticCurveTo(-8.8, -3.9, -6.8, -3.9);
+  g.lineTo(-1, -3.7); g.quadraticCurveTo(0.7, -3.5, 0.7, -1.8);
+  g.lineTo(0.7, 2); g.quadraticCurveTo(0.5, 3.6, -1.4, 3.6);
+  g.lineTo(-7, 3.6); g.quadraticCurveTo(-8.8, 3.6, -8.6, 2.2); g.closePath();
+  g.fill(); g.stroke();
+  // fingers
+  DEMO_HAND.fingers.forEach(([fy, len], i) => {
+    const on = ext.includes(i);
+    capsule(-0.4, fy, on ? len : 2, fy, 1.5, on ? DM.skinHi : DM.skin);
+    if (on) { g.fillStyle = 'rgba(255,242,234,.8)'; g.beginPath(); g.ellipse(len - 0.7, fy, 0.48, 0.42, 0, 0, Math.PI * 2); g.fill(); }
+  });
+  g.restore();
+}
+
+/* ---------- Player stage and thumbnails ---------- */
+function createDemo(host) {
+  const c = document.createElement('canvas');
+  c.className = 'demo-canvas';
+  c.setAttribute('role', 'img');
+  host.prepend(c);
+  const g = c.getContext('2d');
+  const d = { el: c, key: 'cheek', t: 0, last: null, paused: false, onFrame: null, onCue: null, cue: '' };
+  d.setMove = guide => { d.key = demoKey(guide); d.t = 0; d.cue = ''; c.setAttribute('aria-label', 'Übung wird vorgemacht'); };
+  d.tick = now => {
+    const time = now / 1000;
+    const dt = d.last == null ? 0 : Math.min(0.1, time - d.last);
+    d.last = time;
+    if (!d.paused) d.t += dt;
+    if (d.onFrame) d.onFrame(dt);
+    const dpr = DPR();
+    const w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr);
+    if (!w || !h) return;
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    g.clearRect(0, 0, w, h);
+    const pose = DEMO_MOVES[d.key](reduceMotion ? DEMO_THUMB_T[d.key] || 1 : d.t);
+    demoPaint(g, w, h, pose, d.t);
+    if (pose.cue !== d.cue) { d.cue = pose.cue; if (d.onCue) d.onCue(pose.cue); }
+  };
+  addLooper(d);
+  return d;
+}
+const demoThumbCache = new Map();
+function demoThumb(guide, w, h) {
+  const key = demoKey(guide) + w + 'x' + h;
+  if (demoThumbCache.has(key)) return demoThumbCache.get(key);
+  const c = document.createElement('canvas');
+  c.width = w * 2; c.height = h * 2;
+  const g = c.getContext('2d');
+  const bg = g.createRadialGradient(c.width / 2, c.height * 0.38, 0, c.width / 2, c.height * 0.45, c.width * 0.8);
+  bg.addColorStop(0, '#FFFFFF'); bg.addColorStop(1, '#E9EDEB');
+  g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
+  const k = demoKey(guide);
+  // zoom in on the face for the small picture
+  g.save();
+  g.translate(c.width / 2, c.height / 2);
+  g.scale(1.45, 1.45);
+  g.translate(-c.width / 2, -c.height * 0.4);
+  demoPaint(g, c.width, c.height, DEMO_MOVES[k](DEMO_THUMB_T[k] || 1), 0);
+  g.restore();
+  let url = '';
+  try { url = c.toDataURL('image/png'); } catch (e) { url = ''; }
+  demoThumbCache.set(key, url);
+  return url;
 }
 
 /* ============================== UI helpers ============================== */
@@ -3456,11 +3835,15 @@ SCREENS.tour = {
         T.st.sway = false;
         const timer = document.createElement('div');
         timer.className = 'p-timer num';
+        timer.style.zIndex = '2';
         host.appendChild(timer);
-        T.st.frame = (time, st, v) => { guideView(mv.g, time, v); timer.textContent = mmss(40 - (time % 40)); };
-        T.st.overlay = (g, time, st) => drawGuide(g, i => P2(st, i), mv.g, time, st.dpr);
-        extra.innerHTML = `<div class="card"><p class="h3">${esc(mv.t)}</p><p class="small muted">${esc(mv.d)}</p><p class="tiny">Jede Übung wird auf deinem eigenen 3D-Gesicht gezeigt, mit Timer. Wir sagen dir auch ehrlich, was sie bringt und was nicht.</p></div>`;
-        T.cleanTimer = () => timer.remove();
+        const demo = createDemo(host);
+        demo.el.classList.add('cover');
+        demo.setMove(mv.g);
+        let left = 40;
+        demo.onFrame = dt => { left -= dt; if (left <= 0) left += 40; timer.textContent = mmss(left); };
+        extra.innerHTML = `<div class="card"><p class="h3">${esc(mv.t)}</p><p class="small muted">${esc(mv.d)}</p><p class="tiny">Jede Übung wird dir vorgemacht, Schritt für Schritt und mit Timer. Wir sagen dir auch ehrlich, was sie bringt und was nicht.</p></div>`;
+        T.cleanTimer = () => { timer.remove(); removeLooper(demo); demo.el.remove(); };
       } else if (T.i === 4) {
         const items = careSet({ skinType: 'combo' }, { skin: { spots: 60, pores: 70, red: 80, eyes: 80, shine: 70, texture: 80 }, total: 70 }).slice(0, 4);
         extra.innerHTML = `<div class="card"><div class="between"><p class="label">Beispiel-Set für Mischhaut</p></div>${items.map(p => `<div class="prod"><span class="bottle">${ICON.bottle}</span><div><b>${esc(p.t)}</b><span>${esc(p.when)}. Hilft bei ${p.for.map(m => METRICS[m].name).join(' und ')}.</span></div></div>`).join('')}</div>
@@ -5381,6 +5764,7 @@ function fillThumb(img, scanId, o, rtGuide) {
     const f = scanId ? await loadFace(scanId) : null;
     if (!img.isConnected) return;
     const face = f || AVG_FACE_DATA;
+    if (rtGuide) { img.src = demoThumb(rtGuide, o.w || 128, o.h || 128); return; }
     const url = faceThumb((f ? scanId : 'avg') + (rtGuide ? rtGuide.type + (rtGuide.path || rtGuide.at || '') : ''), face, { ...o, tex: !!(f && f.img) && o.tex !== false, guide: rtGuide });
     if (url) img.src = url;
   })();
@@ -5634,39 +6018,31 @@ async function openPlayer(rtId) {
   if (!ROUTINES[rtId]) return;
   closeSheet(true);
   const R = ROUTINES[rtId];
-  Object.assign(player, { rt: rtId, i: 0, left: R.moves[0].s, running: true, last: null, finished: false });
+  Object.assign(player, { rt: rtId, i: 0, left: R.moves[0].s, running: true, last: null, finished: false, shown: -1 });
   const pl = $('#player');
   pl.hidden = false;
   document.body.classList.add('locked');
   pl.innerHTML = `<div class="player-in">
       <div class="top"><button class="icon-btn" type="button" data-act="p-close" aria-label="Schließen">${ICON.close}</button><div class="segs" id="p-segs" aria-hidden="true">${R.moves.map(() => '<span><i></i></span>').join('')}</div></div>
-      <div class="specimen" id="p-stage"><span class="stage-badge">${esc(R.name)}</span><div class="p-timer num" id="p-timer">${mmss(R.moves[0].s)}</div></div>
+      <div class="specimen" id="p-stage"><span class="stage-badge">${esc(R.name)}</span><p class="p-cue" id="p-cue" aria-live="polite"></p><div class="p-timer num" id="p-timer">${mmss(R.moves[0].s)}</div></div>
       <div class="p-move"><p class="label" id="p-step"></p><h2 class="h2" id="p-title"></h2><p id="p-desc"></p></div>
       <div class="p-ctl"><button class="icon-btn" type="button" data-act="p-prev" aria-label="Vorherige Übung">${ICON.prev}</button><button class="btn" type="button" data-act="p-toggle" id="p-main">${ICON.pause}Pause</button><button class="icon-btn" type="button" data-act="p-next" aria-label="Nächste Übung">${ICON.skip}</button></div>
       <p class="tiny">${esc(R.honest)}</p>
     </div>`;
-  const ls = latestScan();
-  const f = ls ? await loadFace(ls.id) : null;
-  if (pl.hidden || player.rt !== rtId) return;
-  const st = createStage($('#p-stage', pl), { sway: false, dist: 3.05, lift: -0.02 });
-  player.st = st;
-  stageFace(st, f || AVG_FACE_DATA);
-  st.look.tex = f && f.img ? 1 : 0;
-  st.look.lines = 0;
-  st.frame = (time, s, v) => {
+  // a model shows every move, with a short cue for what to do right now
+  const demo = createDemo($('#p-stage', pl));
+  player.st = demo;
+  const cueEl = $('#p-cue', pl);
+  demo.onCue = txt => { cueEl.textContent = txt || ''; cueEl.hidden = !txt; };
+  demo.onFrame = dt => {
     const mv = R.moves[player.i];
     if (!mv || player.finished) return;
-    if (player.last == null) player.last = time;
-    const dt = time - player.last;
-    player.last = time;
+    demo.paused = !player.running;
     if (player.running) player.left -= dt;
-    v.yaw = Math.sin(time * 0.5) * 0.12;
-    guideView(mv.g, time, v);
     const tEl = $('#p-timer');
     if (tEl) tEl.textContent = mmss(player.left);
     if (player.left <= 0) nextMove(1);
   };
-  st.overlay = (g, time, s) => { const mv = R.moves[player.i]; if (mv && !player.finished) drawGuide(g, i => P2(s, i), mv.g, time, s.dpr); };
   showMove();
   try { if (navigator.wakeLock && navigator.wakeLock.request) player.lock = await navigator.wakeLock.request('screen'); } catch (e) { player.lock = null; }
 }
@@ -5676,6 +6052,8 @@ function showMove() {
   $('#p-step').textContent = `Übung ${player.i + 1} von ${R.moves.length}`;
   $('#p-title').textContent = mv.t;
   $('#p-desc').textContent = mv.d;
+  if (player.st && player.st.setMove && player.i !== player.shown) player.st.setMove(mv.g);
+  player.shown = player.i;
   $$('#p-segs span').forEach((s, k) => s.classList.toggle('done', k < player.i));
   const main = $('#p-main');
   if (main) main.innerHTML = player.running ? `${ICON.pause}Pause` : `${ICON.resume}Weiter`;
